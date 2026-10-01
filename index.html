@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <title>Knowledge Hub</title>
+    
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100%;
+            height: 100dvh;
+            width: 100%;
+            overflow: hidden;
+            background-color: #eef2f5;
+        }
+
+        /* --- New Auth Screen Styles --- */
+        #auth-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+        }
+
+        .auth-box {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .auth-input {
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            text-align: center;
+        }
+
+        .auth-input:focus {
+            border-color: #0084ff;
+        }
+
+        .auth-btn {
+            background-color: #0084ff;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* --- New Delete Modal Styles --- */
+        #delete-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100000;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #1e293b;
+            margin-bottom: 5px;
+        }
+
+        .modal-btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .modal-btn-group button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-cancel {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-next {
+            background: #dc3545;
+            color: white;
+        }
+
+        /* --- Original App Styles --- */
+        .chat-app {
+            display: none; /* Hidden initially, shown after auth */
+            flex-direction: column;
+            height: 100%;
+            height: 100dvh;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            position: relative;
+        }
+
+        .chat-header {
+            flex-shrink: 0;
+            background: #ffffff;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .chat-header h2 {
+            font-size: 1.1rem;
+            color: #212529;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            background-color: #2ec4b6;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .delete-all-btn {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .delete-all-btn:hover {
+            background: #ffe6e6;
+        }
+
+        .messages-container {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 12px 12px 16px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background-color: #f8f9fa;
+            scroll-behavior: smooth;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+            position: relative;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-bubble.sent {
+            align-self: flex-end;
+            background-color: #0084ff;
+            color: #ffffff;
+            border-bottom-right-radius: 2px;
+        }
+
+        .message-bubble.received {
+            align-self: flex-start;
+            background-color: #ffffff;
+            color: #1c1e21;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+            border: 1px solid #e2e8f0;
+        }
+
+        .message-time {
+            font-size: 0.65rem;
+            margin-top: 3px;
+            text-align: right;
+            opacity: 0.75;
+            transition: color 0.3s;
+        }
+
+        /* --- New Seen Status Style --- */
+        .message-time.seen {
+            color: #0084ff;
+            font-weight: bold;
+            opacity: 1;
+        }
+        .sent .message-time.seen {
+            color: #a3d1ff; /* Lighter blue for dark background to look visible */
+            text-shadow: 0 0 2px rgba(0,0,0,0.2);
+        }
+
+        .message-image {
+            max-width: 100%;
+            border-radius: 8px;
+            display: block;
+            margin-bottom: 4px;
+            cursor: pointer;
+        }
+
+        .input-container {
+            flex-shrink: 0;
+            background: #ffffff;
+            padding: 10px 12px;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .attachment-btn {
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 10px 16px;
+            font-size: 0.95rem;
+            outline: none;
+            color: #1e293b;
+        }
+
+        .chat-input:focus {
+            background: #ffffff;
+            border-color: #0084ff;
+        }
+
+        .send-btn {
+            background: #0084ff;
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #image-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<!-- White Screen Auth Gate -->
+<div id="auth-screen">
+    <div class="auth-box">
+        <input type="password" id="entry-code" class="auth-input" placeholder="Enter">
+        <button class="auth-btn" onclick="checkEntryCode()">Next</button>
+    </div>
+</div>
+
+<!-- Custom Delete Modal -->
+<div id="delete-modal">
+    <div class="modal-content">
+        <h3>Enter</h3>
+        <input type="password" id="delete-code-input" class="auth-input" placeholder="Enter">
+        <div class="modal-btn-group">
+            <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-next" onclick="executeDelete()">Next</button>
+        </div>
+    </div>
+</div>
+
+<!-- Main App Structure -->
+<div class="chat-app" id="chat-app">
+    <div class="chat-header">
+        <h2><span class="status-dot"></span>Save Your Personal Doubt 🤯</h2>
+        <button class="delete-all-btn" onclick="openDeleteModal()" title="Delete all doubt">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+        </button>
+    </div>
+
+    <div class="messages-container" id="messages-container"></div>
+
+    <div class="input-container">
+        <button class="attachment-btn" onclick="document.getElementById('image-input').click()" title="Send photo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </button>
+        <input type="file" id="image-input" accept="image/*" onchange="handleImageUpload(event)">
+        <input type="text" id="chat-input" class="chat-input" placeholder="Type your doubt..." autocomplete="off">
+        <button class="send-btn" onclick="sendMessage()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+    </div>
+</div>
+
+<script>
+    // ------------------------------------------------------------------
+    // Integrated Firebase Credentials
+    // ------------------------------------------------------------------
+    const firebaseConfig = {
+        apiKey: "AIzaSyA0lTykwwEoaP7-Sp2pIJ5JJYkJxolsEoM",
+        authDomain: "rainbowclassescommunity.firebaseapp.com",
+        databaseURL: "https://rainbowclassescommunity-default-rtdb.firebaseio.com",
+        projectId: "rainbowclassescommunity",
+        storageBucket: "rainbowclassescommunity.firebasestorage.app",
+        messagingSenderId: "908561934606",
+        appId: "1:908561934606:web:9835e2475f6d59bf020f5f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ------------------------------------------------------------------
+    // User Identity
+    // ------------------------------------------------------------------
+    let myUserId = localStorage.getItem('chat_user_id');
+    if (!myUserId) {
+        myUserId = 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('chat_user_id', myUserId);
+    }
+
+    const messagesContainer = document.getElementById('messages-container');
+    const chatInput = document.getElementById('chat-input');
+    const chatApp = document.getElementById('chat-app');
+    
+    // Store rendered message elements to easily update them when seen
+    const renderedMessages = {};
+
+    // ------------------------------------------------------------------
+    // App Entry Logic (White Screen Gatekeeper)
+    // ------------------------------------------------------------------
+    function checkEntryCode() {
+        const code = document.getElementById('entry-code').value.trim();
+        if (code === "cmxyz") {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('chat-app').style.display = 'flex';
+            scrollToBottom();
+        } else {
+            alert("Wrong Code!");
+        }
+    }
+
+    // Allow 'Enter' key on auth screen
+    document.getElementById('entry-code').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkEntryCode();
+    });
+
+    // ------------------------------------------------------------------
+    // Scroll Logic
+    // ------------------------------------------------------------------
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    chatInput.addEventListener('focus', () => {
+        setTimeout(scrollToBottom, 300);
+    });
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            chatApp.style.height = `${window.visualViewport.height}px`;
+            scrollToBottom();
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Send Message
+    // ------------------------------------------------------------------
+    function sendMessage(imageURL = null) {
+        const text = chatInput.value.trim();
+        if (!text && !imageURL) return;
+
+        const messageData = {
+            senderId: myUserId,
+            text: text || null,
+            image: imageURL || null,
+            timestamp: Date.now(),
+            isSeen: false // New field to track read status
+        };
+
+        db.ref('chat_messages').push(messageData);
+        chatInput.value = '';
+    }
+
+    chatInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // ------------------------------------------------------------------
+    // Delete System (Modal & Logic)
+    // ------------------------------------------------------------------
+    function openDeleteModal() {
+        document.getElementById('delete-modal').style.display = 'flex';
+        document.getElementById('delete-code-input').value = '';
+        document.getElementById('delete-code-input').focus();
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('delete-modal').style.display = 'none';
+    }
+
+    function executeDelete() {
+        const code = document.getElementById('delete-code-input').value.trim();
+        if (code === "cmxyz") {
+            db.ref('chat_messages').remove().then(() => {
+                closeDeleteModal();
+            }).catch(error => {
+                alert("डिलीट करने में कोई समस्या आई: " + error);
+            });
+        } else {
+            alert("Wrong Code!");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Listen for Messages & Read Receipts
+    // ------------------------------------------------------------------
+    function listenForMessages() {
+        // Load messages when added
+        db.ref('chat_messages').limitToLast(100).on('child_added', (snapshot) => {
+            const data = snapshot.val();
+            const key = snapshot.key;
+            
+            renderSingleMessage(data, key);
+
+            // Read Receipt Logic: If the message is NOT from me, and not seen yet, mark it as seen in Firebase
+            if (data.senderId !== myUserId && !data.isSeen) {
+                db.ref('chat_messages/' + key).update({ isSeen: true });
+            }
+        });
+
+        // Listen for updates (when 'isSeen' becomes true)
+        db.ref('chat_messages').limitToLast(100).on('child_changed', (snapshot) => {
+            const data = snapshot.val();
+            const key = snapshot.key;
+            
+            // If message becomes seen, update the UI dynamically
+            if (data.isSeen && renderedMessages[key]) {
+                const timeElement = renderedMessages[key].querySelector('.message-time');
+                if (timeElement) {
+                    timeElement.classList.add('seen');
+                }
+            }
+        });
+
+        // Clear the screen instantly if the database is cleared
+        db.ref('chat_messages').on('value', (snapshot) => {
+            if (!snapshot.exists()) {
+                messagesContainer.innerHTML = ''; 
+                // clear our local mapping since DOM is cleared
+                for (let key in renderedMessages) delete renderedMessages[key];
+            }
+        });
+    }
+
+    listenForMessages();
+
+    // ------------------------------------------------------------------
+    // Render Message Bubbles
+    // ------------------------------------------------------------------
+    function renderSingleMessage(data, key) {
+        const isMe = data.senderId === myUserId;
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${isMe ? 'sent' : 'received'}`;
+        bubble.id = `msg-${key}`;
+
+        let contentHtml = '';
+
+        if (data.image) {
+            contentHtml += `<img src="${data.image}" class="message-image" alt="Image" onclick="window.open('${data.image}', '_blank')">`;
+        }
+
+        if (data.text) {
+            contentHtml += `<div>${escapeHTML(data.text)}</div>`;
+        }
+
+        const timeStr = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Add "seen" class immediately if it was already seen in DB
+        const seenClass = data.isSeen ? 'seen' : '';
+        contentHtml += `<div class="message-time ${seenClass}">${timeStr}</div>`;
+
+        bubble.innerHTML = contentHtml;
+        messagesContainer.appendChild(bubble);
+        
+        // Save reference for real-time seen status updates
+        renderedMessages[key] = bubble;
+
+        scrollToBottom();
+    }
+
+    // ------------------------------------------------------------------
+    // Automatic Image Compression (< 1MB)
+    // ------------------------------------------------------------------
+    function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        compressImage(file, function (compressedBase64) {
+            sendMessage(compressedBase64);
+            event.target.value = '';
+        });
+    }
+
+    function compressImage(file, callback) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function (e) {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = function () {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxResolution = 1200;
+
+                if (width > height) {
+                    if (width > maxResolution) {
+                        height *= maxResolution / width;
+                        width = maxResolution;
+                    }
+                } else {
+                    if (height > maxResolution) {
+                        width *= maxResolution / height;
+                        height = maxResolution;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                let quality = 0.8;
+                let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+                while (dataUrl.length > 950000 && quality > 0.2) {
+                    quality -= 0.1;
+                    dataUrl = canvas.toDataURL('image/jpeg', quality);
+                }
+
+                callback(dataUrl);
+            };
+        };
+    }
+
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, 
+            tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+        );
+    }
+</script>
+
+</body>
+</html>
